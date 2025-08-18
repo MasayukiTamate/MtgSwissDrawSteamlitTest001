@@ -38,3 +38,5 @@ st.button("一回戦")
 SeisekiHyouji("最終")
 SeisekiHyouji("一回戦終了時")
 SeisekiHyouji("最終")
+
+#magic mpc
