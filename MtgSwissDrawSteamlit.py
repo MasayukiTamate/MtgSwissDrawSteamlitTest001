@@ -9,17 +9,21 @@ def addplayer(n):
         "名前": n,
         "勝ち点": 0,
         "マッチポイント％":0.000,
-        "オポメント％":0.000
+        "オポメント％":0.000,
+        "対戦履歴":[]
     })
     pass
 def taisenKime():
+    pass
+
+def taisenHyouji():
     pass
 
 def SeisekiHyouji(itu):
     text = itu + "成績"
     st.write(text)
     for i in playerData:
-        st.write(f"名前:{i["名前"]} 勝ち点:{i["勝ち点"]} MP%:{i["マッチポイント％"]} OP%:{i["オポメント％"]}")
+        st.write(f"名前:{i["名前"]}　勝ち点:{i["勝ち点"]}　MP%:{i["マッチポイント％"]}　OP%:{i["オポメント％"]}　{i["対戦履歴"]}")
     pass
 
 
@@ -49,9 +53,12 @@ for i in range(st.session_state["count"]):
 for i, j in zip(playerName, playerData):
     j["名前"] = i
 
-#st.button("一回戦")
+st.button("一回戦の対戦相手をリフレッシュ")
+
+
 
 taisenKime()
+
 
 
 SeisekiHyouji("一回戦終了時")
