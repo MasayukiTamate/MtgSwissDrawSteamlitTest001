@@ -13,10 +13,25 @@ def addplayer(n):
         "対戦履歴":[]
     })
     pass
-def taisenKime():
-    pass
+def taisenKime(pd):
+    taisenNarabi = []
+    for i in pd:
+        taisenNarabi.append(i["名前"])
+    return taisenNarabi
 
-def taisenHyouji():
+def taisenHyouji(taisenNarabi):
+
+    seki = int(len(taisenNarabi) // 2)
+
+    sekiNo = 0
+    if len(taisenNarabi) > 1:
+        for i in range(0, seki):
+            st.write(f"{i + 1}席： {taisenNarabi[sekiNo]} vs {taisenNarabi[sekiNo + 1]}")
+            sekiNo = sekiNo + 2
+
+    if len(taisenNarabi) % 2:
+            st.write(f"{seki + 1}席： {taisenNarabi[sekiNo]} vs byb")
+
     pass
 
 def SeisekiHyouji(itu):
@@ -57,7 +72,7 @@ st.button("一回戦の対戦相手をリフレッシュ")
 
 
 
-taisenKime()
+taisenHyouji(taisenKime(playerData))
 
 
 
