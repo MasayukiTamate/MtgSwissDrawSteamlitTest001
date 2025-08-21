@@ -15,10 +15,15 @@ def addplayer(n):
     pass
 def taisenKime(pd):
     taisenNarabi = []
+
     for i in pd:
         taisenNarabi.append(i["名前"])
-    return taisenNarabi
 
+    return taisenNarabi
+def taisenBottonHyouji(namae):
+    st.button(f"{namae}が勝った")
+
+    return namae
 def taisenHyouji(taisenNarabi):
 
     seki = int(len(taisenNarabi) // 2)
@@ -68,11 +73,20 @@ for i in range(st.session_state["count"]):
 for i, j in zip(playerName, playerData):
     j["名前"] = i
 
-st.button("一回戦の対戦相手をリフレッシュ")
+if st.checkbox(""):
+    st.button("一回戦の対戦相手をリフレッシュ")
+
+taisenNa = taisenKime(playerData)
+osareta = ""
+
+st.write(taisenNa)
+if taisenNa:
+    for i in taisenNa:
+        osareta = taisenBottonHyouji(i)
 
 
-
-taisenHyouji(taisenKime(playerData))
+st.write(osareta)
+taisenHyouji(taisenNa)
 
 
 
