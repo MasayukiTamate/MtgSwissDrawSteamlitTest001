@@ -108,6 +108,10 @@ for i in playerData:
     
 
 if st.checkbox(""):
+    pass
+
+with st.expander("リフレッシュ", icon="👊"):
+
     st.button("一回戦の対戦相手をリフレッシュ")
 
 taisenNa = taisenKime(playerData)
