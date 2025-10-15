@@ -8,6 +8,9 @@ import streamlit as st
 from streamlit_option_menu import option_menu
 
 #フラグとカウンター
+#人数をグローバルに
+if 'count' not in st.session_state:
+    st.session_state["count"] = 3
 if "deleteFlag" not in st.session_state:
     st.session_state["deleteFlag"] = 0
 
@@ -16,3 +19,7 @@ topplayertuikabotton = st.columns(2)
 
 if topplayertuikabotton[0].button("プレイヤーの追加", key=99):
     st.session_state["count"] += 1
+
+'''
+表示されるコメント
+'''
