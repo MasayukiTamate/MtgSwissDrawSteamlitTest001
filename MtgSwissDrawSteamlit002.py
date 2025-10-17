@@ -16,6 +16,13 @@ class PlayerData():
         self.opponentHistory = []
         pass
 
+beforName = ["たなか","やまだ","さかもと"]
+
+pData = []
+
+for beNe in beforName:
+    pData.append(PlayerData(beNe))
+
 
 #フラグとカウンター
 #人数をグローバルに
@@ -29,15 +36,19 @@ topplayertuikabotton = st.columns(2)
 
 if topplayertuikabotton[0].button("プレイヤーの追加", key=99):
     st.session_state["count"] += 1
-beforName = ["たなか","やまだ","さかもと"]
+if topplayertuikabotton[1].button("プレイヤーの削除", key=98):
+    st.session_state["deleteFlag"] += 1
+    if st.session_state["count"] > 0:
+        st.session_state["count"] -= 1
 
-pData = []
+#プレイヤーデータ初期化
+for i in range(st.session_state["count"]):
+    if i + 1> len(pData):
+        pData.append(PlayerData("プレイヤー" + str(i + 1)))
 
-for beNe in beforName:
-    pData.append(PlayerData(beNe))
-    
 #テキストボックス設置
 count = 1
-for pd in pData:
-    st.text_input("プレイヤー", pd.name,key=count + 100)
+for i in range(st.session_state["count"]):
+    st.text_input("プレイヤー", pData[i].name ,key=count + 100)
     count = count + 1
+
