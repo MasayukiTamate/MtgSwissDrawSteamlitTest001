@@ -11,6 +11,7 @@ class PlayerData():
     def __init__(self, na):
         self.name = na
         self.winPoint = 0
+        self.winCountEvery = []
         self.matchPointPar = 0.00
         self.opponentPar = 0.00
         self.opponentHistory = []
@@ -68,16 +69,27 @@ for i in range(st.session_state["count"]):
 
 tentative = []
 
+WinLose = []
+wiLo = []
+for _ in range(len(pData)):
+    wiLo.append(0)
 
+WinLose.append(wiLo)
+
+if "WinLose" not in st.session_state:
+    st.session_state["WinLose"] = 0
 
 st.write("試合１")
 sData = SeatData(pData)
 
 count = 0
+for pd in pData:
+    pd.winCountEvery.append(0)
 for couS in range(sData.CountSeat):
     st.write("席" + str(couS + 1) + "つ目")
     st.write(f"{pData[count].name}")
-    
+    st.write("勝ち")
+    st.write(pData[count].winCountEvery[0])
     count = count + 1
     if count < len(pData):
         st.write(f"{pData[count].name}")
