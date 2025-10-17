@@ -17,12 +17,14 @@ class PlayerData():
         pass
 
 beforName = ["たなか","やまだ","さかもと"]
-
 pData = []
 
 for beNe in beforName:
     pData.append(PlayerData(beNe))
 
+st.title("MTGスイスドロー大会成績管理アプリ")
+st.caption("by SmeatlitTools") 
+st.write("プレイヤーの名前を入力してください")
 
 #フラグとカウンター
 #人数をグローバルに
@@ -52,3 +54,13 @@ for i in range(st.session_state["count"]):
     st.text_input("プレイヤー", pData[i].name ,key=count + 100)
     count = count + 1
 
+
+
+for pd in pData:
+    st.write(f"{pd.name} 勝利点：{pd.winPoint} ウィンP％：{pd.matchPointPar} オポP％：{pd.opponentPar} 敵履歴；{pd.opponentHistory}")
+'''
+lenName = []
+for pd in pData:
+    lenName.append(len(pd.name))
+" " * lenName.max() - len(pd.name) 
+'''
