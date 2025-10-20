@@ -85,15 +85,45 @@ sData = SeatData(pData)
 count = 0
 for pd in pData:
     pd.winCountEvery.append(0)
+
 for couS in range(sData.CountSeat):
-    st.write("席" + str(couS + 1) + "つ目")
+    st.write("第" + str(couS + 1) + "席目")
     st.write(f"{pData[count].name}")
-    st.write("勝ち")
-    st.write(pData[count].winCountEvery[0])
-    count = count + 1
-    if count < len(pData):
-        st.write(f"{pData[count].name}")
+
+    #分岐
+    if count + 1 < len(pData):
+        st.write("勝ち")
+        st.write(pData[count].winCountEvery[0])
         count = count + 1
+        st.write("VS")
+        st.write(pData[count].name)
+        st.write("勝ち")
+        st.write(pData[count].winCountEvery[0])
+        count = count + 1
+    else:
+        st.write("不戦勝")
+
+#敵履歴代入
+'''
+count = 0
+for couS in range(sData.CountSeat):
+
+    if count + 1 < len(pData):
+        pData[count + 1].opponentHistory.append( pData[count].name)
+        count = count + 1
+    else:
+
+        pData[count - 1].opponentHistory.append( pData[count].name)
+        count = count + 1
+    else:
+        pData[count - 1].opponentHistory.append("BYEさん")
+'''
+
+
+
+
+
+
 
 st.write("試合１の成績")
 tentative.append(pData.copy())
