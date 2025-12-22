@@ -80,6 +80,21 @@ class PlayerData:
                 self.match_win_count += 1
         elif result == "DRAW":
             self.win_points += 1
+            
+    def remove_last_result(self):
+        """直近の対戦結果を取り消す（修正用）"""
+        if not self.history:
+            return
+            
+        last_match = self.history.pop()
+        result = last_match.result
+        
+        if result == "WIN" or result == "BYE":
+            self.win_points -= 3
+            if result == "WIN":
+                self.match_win_count -= 1
+        elif result == "DRAW":
+            self.win_points -= 1
     
     def calculate_mw_percent(self) -> float:
         """マッチ勝率 (MW%)"""
@@ -201,6 +216,20 @@ class RoundMatch:
         self.is_finished = True
         self.player1.add_result(self.player2.name, "DRAW", 1, 1)
         self.player2.add_result(self.player1.name, "DRAW", 1, 1)
+
+    def cancel_result(self):
+        """結果を取り消して未確定状態に戻す"""
+        if not self.is_finished:
+            return
+            
+        self.is_finished = False
+        self.winner = None
+        self.is_draw = False
+        
+        # 両プレイヤーの最新履歴を削除（ロールバック）
+        self.player1.remove_last_result()
+        if self.player2:
+            self.player2.remove_last_result()
 
 
 class TournamentManager:
@@ -422,6 +451,11 @@ def render_matches(tm: TournamentManager):
                     if st.button("Draw (1-1)", key=f"draw_{tm.current_round}_{i}"):
                         match.report_draw()
                         st.rerun()
+                elif match.is_finished:
+                    # 修正（リセット）ボタン
+                    if st.button("修正(Reset)", key=f"reset_{tm.current_round}_{i}", type="secondary"):
+                        match.cancel_result()
+                        st.rerun()
 
             # Right Player
             with col_r:
@@ -534,8 +568,11 @@ def main():
         if tm.current_round >= 3:
             st.markdown("---")
             if st.button("大会を終了して結果を見る", type="secondary", use_container_width=True):
-                tm.is_finished = True
-                st.rerun()
+                if not tm.is_current_round_complete:
+                    st.error("⚠️ 全ての対戦結果が入力されていません。結果を確定してから終了してください。")
+                else:
+                    tm.is_finished = True
+                    st.rerun()
     
     # 対戦表示
     if tm.current_round > 0:
