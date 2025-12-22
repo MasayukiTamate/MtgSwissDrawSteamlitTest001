@@ -40,6 +40,8 @@ class MatchResult:
     """
     opponent_name: str
     result: str  # "WIN", "LOSE", "DRAW", "BYE"
+    game_wins: int = 0
+    game_losses: int = 0
 
 class PlayerData:
     """
@@ -67,9 +69,9 @@ class PlayerData:
                 return True
         return False
 
-    def add_result(self, opponent_name: str, result: str):
+    def add_result(self, opponent_name: str, result: str, game_wins: int = 0, game_losses: int = 0):
         """対戦結果を記録し、勝ち点を更新する"""
-        self.history.append(MatchResult(opponent_name, result))
+        self.history.append(MatchResult(opponent_name, result, game_wins, game_losses))
         if result == "WIN" or result == "BYE":
             self.win_points += 3
             if result == "WIN":
@@ -77,12 +79,83 @@ class PlayerData:
         elif result == "DRAW":
             self.win_points += 1
     
-    def get_stats_dict(self):
+    def calculate_mw_percent(self) -> float:
+        """マッチ勝率 (MW%)"""
+        matches = len(self.history)
+        if matches == 0:
+            return 0.0
+        
+        # ポイントから算出ルール (MTG準拠: Points / (3 * Matches))
+        # ただし下限33%
+        raw_mw = self.win_points / (3 * matches)
+        return max(0.33, raw_mw)
+
+    def calculate_gw_percent(self) -> float:
+        """ゲーム勝率 (GW%)"""
+        # (獲得ゲームポイント) / (総プレイゲーム数 * 3) 
+        # 当アプリでは入力されたゲーム数ベースで計算
+        total_game_wins = sum(h.game_wins for h in self.history)
+        total_game_losses = sum(h.game_losses for h in self.history)
+        # Byeの場合はゲーム数0だが、勝ち点3相当(2-0)として扱う規定が一般的だが、
+        # ここでは実装簡略化のため、Byeは2-0としてカウントする
+        for h in self.history:
+            if h.result == "BYE":
+                total_game_wins += 2
+        
+        total_games = total_game_wins + total_game_losses
+        if total_games == 0:
+            return 0.0
+            
+        # 勝率 = 勝ったゲーム数 / 総ゲーム数
+        return total_game_wins / total_games
+
+    def calculate_omw_percent(self, all_players: List['PlayerData']) -> float:
+        """オポネントマッチ勝率 (OMW%)"""
+        opponents_mw = []
+        for h in self.history:
+            if h.result == "BYE":
+                continue # Byeは含めない
+            
+            # 対戦相手を探す
+            for p in all_players:
+                if p.name == h.opponent_name:
+                    opponents_mw.append(p.calculate_mw_percent())
+                    break
+        
+        if not opponents_mw:
+            return 0.33 # デフォルト下限
+            
+        return sum(opponents_mw) / len(opponents_mw)
+
+    def calculate_ogw_percent(self, all_players: List['PlayerData']) -> float:
+        """オポネントゲーム勝率 (OGW%)"""
+        opponents_gw = []
+        for h in self.history:
+            if h.result == "BYE":
+                 continue
+            
+            for p in all_players:
+                if p.name == h.opponent_name:
+                    opponents_gw.append(p.calculate_gw_percent())
+                    break
+        
+        if not opponents_gw:
+            return 0.33
+        
+        return sum(opponents_gw) / len(opponents_gw)
+    
+    def get_stats_dict(self, all_players: List['PlayerData']):
         """DataFrame表示用の辞書データを返す"""
         return {
             "ID": self.id,
             "名前": self.name,
             "勝ち点": self.win_points,
+            "OMW%": f"{self.calculate_omw_percent(all_players):.2%}",
+            "GW%": f"{self.calculate_gw_percent():.2%}",
+            "OGW%": f"{self.calculate_ogw_percent(all_players):.2%}",
+            "_raw_omw": self.calculate_omw_percent(all_players), # ソート用
+            "_raw_gw": self.calculate_gw_percent(),
+            "_raw_ogw": self.calculate_ogw_percent(all_players),
             "勝利数": self.match_win_count,
             "試合数": len(self.history)
         }
@@ -98,32 +171,34 @@ class RoundMatch:
         self.winner: Optional[PlayerData] = None
         self.is_draw = False
 
-    def report_win(self, winner: PlayerData):
+    def report_win(self, winner: PlayerData, winner_score: int, loser_score: int):
         """勝者を報告する"""
         if self.is_finished:
-            return # 既に終了している場合は何もしない（修正機能をつけるならここを変更）
+            return 
         
         self.winner = winner
         self.is_finished = True
         
         if self.player2 is None:
-            # Byeの場合
-            self.player1.add_result("BYE", "BYE")
+            # Byeの場合 (2-0扱い)
+            self.player1.add_result("BYE", "BYE", 2, 0)
         else:
             # 通常対戦
             loser = self.player2 if winner == self.player1 else self.player1
-            winner.add_result(loser.name, "WIN")
-            loser.add_result(winner.name, "LOSE")
+            # 勝者: winner_score - loser_score
+            winner.add_result(loser.name, "WIN", winner_score, loser_score)
+            # 敗者: loser_score - winner_score
+            loser.add_result(winner.name, "LOSE", loser_score, winner_score)
 
     def report_draw(self):
-        """引き分けを報告する"""
+        """引き分けを報告する (1-1扱い)"""
         if self.is_finished or self.player2 is None:
             return
 
         self.is_draw = True
         self.is_finished = True
-        self.player1.add_result(self.player2.name, "DRAW")
-        self.player2.add_result(self.player1.name, "DRAW")
+        self.player1.add_result(self.player2.name, "DRAW", 1, 1)
+        self.player2.add_result(self.player1.name, "DRAW", 1, 1)
 
 
 class TournamentManager:
@@ -134,8 +209,10 @@ class TournamentManager:
         self.players: List[PlayerData] = []
         self.current_round: int = 0
         self.current_matches: List[RoundMatch] = []
+        self.current_matches: List[RoundMatch] = []
         self.rounds_history: List[List[RoundMatch]] = []
         self._next_id = 1
+        self.is_finished: bool = False
 
     def add_player(self, name: str):
         """プレイヤーを新規追加する"""
@@ -179,22 +256,33 @@ class TournamentManager:
                     break
             
             # 優先度2: 全員と対戦済みの場合は、ポイントが一番近い(リストの先頭)相手と組む
-            if opponent is None and active_players:
-                opponent = active_players.pop(0)
+            # -> 修正: ここで無理に対戦させず、マッチング不成立＝大会終了とみなす
+            if opponent is None:
+                # 対戦可能な相手がいない(これ以上スイスドローを組めない)
+                # 残り全員が対戦済みならここで終了フラグを立てる
+                self.is_finished = True
+                self.current_matches = [] # 今回作りかけたマッチングは破棄
+                return False # ラウンド作成失敗＝終了
             
-            # ペアリング確定またはByo
-            if opponent:
-                self.current_matches.append(RoundMatch(p1, opponent))
-            else:
-                # 相手が見つからず、リストも空 -> 余り (Bye)
-                self.current_matches.append(RoundMatch(p1, None))
+            # ペアリング確定
+            self.current_matches.append(RoundMatch(p1, opponent))
+            
+        return True # ラウンド作成成功
 
     def get_standings_df(self) -> pd.DataFrame:
         """現在の順位表をDataFrameで取得"""
-        data = [p.get_stats_dict() for p in self.players]
+        data = [p.get_stats_dict(self.players) for p in self.players]
         df = pd.DataFrame(data)
         if not df.empty:
-            df = df.sort_values("勝ち点", ascending=False)
+            # 優先順位: 勝ち点 -> OMW% -> GW% -> OGW%
+            df = df.sort_values(
+                by=["勝ち点", "_raw_omw", "_raw_gw", "_raw_ogw"], 
+                ascending=[False, False, False, False]
+            )
+            # 表示用カラムのみ抽出 (ソート用カラムを除外)
+            display_cols = ["ID", "名前", "勝ち点", "OMW%", "GW%", "OGW%", "勝利数", "試合数"]
+            df = df[display_cols]
+            
         return df
 
     def get_history_df(self) -> pd.DataFrame:
@@ -219,6 +307,7 @@ class TournamentManager:
         self.current_matches = []
         self.rounds_history = []
         self._next_id = 1
+        self.is_finished = False
 
 
 # --- UI関数 (View) ---
@@ -276,8 +365,13 @@ def render_matches(tm: TournamentManager):
                 st.subheader(p1.name)
                 st.write(f"Pts: {p1.win_points}")
                 if not match.is_finished:
-                    if st.button(f"{p1.name} Win", key=f"win_p1_{tm.current_round}_{i}", type="primary"):
-                        match.report_win(p1)
+                    # スコア選択肢
+                    score_options = ["2-0", "2-1", "1-0"]
+                    s1 = st.selectbox(f"Score", score_options, key=f"s1_{tm.current_round}_{i}", label_visibility="collapsed")
+                    
+                    if st.button(f"Win ({s1})", key=f"win_p1_{tm.current_round}_{i}", type="primary"):
+                        w, l = map(int, s1.split("-"))
+                        match.report_win(p1, w, l)
                         st.rerun()
                 elif match.winner == p1:
                     st.success("WINNER 👑")
@@ -290,7 +384,7 @@ def render_matches(tm: TournamentManager):
             with col_c:
                 st.markdown("<h3 style='text-align: center;'>VS</h3>", unsafe_allow_html=True)
                 if not match.is_finished and p2 is not None:
-                    if st.button("Draw", key=f"draw_{tm.current_round}_{i}"):
+                    if st.button("Draw (1-1)", key=f"draw_{tm.current_round}_{i}"):
                         match.report_draw()
                         st.rerun()
 
@@ -300,8 +394,12 @@ def render_matches(tm: TournamentManager):
                     st.subheader(p2.name)
                     st.write(f"Pts: {p2.win_points}")
                     if not match.is_finished:
-                        if st.button(f"{p2.name} Win", key=f"win_p2_{tm.current_round}_{i}", type="primary"):
-                            match.report_win(p2)
+                        score_options = ["2-0", "2-1", "1-0"]
+                        s2 = st.selectbox(f"Score", score_options, key=f"s2_{tm.current_round}_{i}", label_visibility="collapsed")
+                        
+                        if st.button(f"Win ({s2})", key=f"win_p2_{tm.current_round}_{i}", type="primary"):
+                            w, l = map(int, s2.split("-"))
+                            match.report_win(p2, w, l)
                             st.rerun()
                     elif match.winner == p2:
                         st.success("WINNER 👑")
@@ -313,8 +411,8 @@ def render_matches(tm: TournamentManager):
                     st.subheader("BYE (不戦勝)")
                     st.success("自動勝利")
                     if not match.is_finished:
-                        # 自動的に不戦勝処理
-                        match.report_win(p1)
+                        # 自動的に不戦勝処理 (2-0)
+                        match.report_win(p1, 2, 0)
                         st.rerun()
 
 def render_standings(tm: TournamentManager):
@@ -335,12 +433,45 @@ def render_standings(tm: TournamentManager):
         if not df_history.empty:
             st.dataframe(df_history, use_container_width=True, hide_index=True)
 
+def render_final_result(tm: TournamentManager):
+    """結果発表画面"""
+    st.balloons()
+    st.title("🎉 大会終了！結果発表 🎉")
+    
+    # 優勝者判定
+    df = tm.get_standings_df()
+    if not df.empty:
+        winner_name = df.iloc[0]["名前"]
+        st.success(f"🏆 優勝: {winner_name} 選手 🏆")
+        st.metric(label="Winner", value=winner_name)
+
+    # 最終順位表
+    st.subheader("📊 最終順位表")
+    if not df.empty:
+        st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    # 最終履歴
+    st.subheader("📜 全対戦履歴")
+    df_history = tm.get_history_df()
+    if not df_history.empty:
+        st.dataframe(df_history, use_container_width=True, hide_index=True)
+    
+    # リセットボタン
+    if st.button("新しい大会を始める（リセット）", type="primary"):
+        tm.reset_tournament()
+        st.rerun()
+
 def main():
     st.set_page_config(**SET_PAGE_CONFIG)
     st.markdown(HIDE_ST_STYLE, unsafe_allow_html=True)
     
     init_session()
     tm = st.session_state.tm # シングルトン的に扱うインスタンス
+
+    # 大会終了済みなら結果画面へ
+    if tm.is_finished:
+        render_final_result(tm)
+        return
 
     st.title("MTG Swiss Draw Manager (OOP Ver)")
 
@@ -350,11 +481,23 @@ def main():
     # メインコントロール
     col1, col2 = st.columns([1, 4])
     with col1:
+        # 次のラウンドへ進むボタン
         if st.button("次の一回戦を開始", type="primary", use_container_width=True):
             if len(tm.players) < 2:
                 st.error("プレイヤーが2名以上必要です")
             else:
-                tm.start_new_round()
+                success = tm.start_new_round()
+                if not success:
+                    # ラウンド作成失敗 ＝ 大会終了
+                    st.rerun()
+                else:
+                    st.rerun()
+        
+        # 第3回戦以降: 途中終了して結果発表を行うボタン
+        if tm.current_round >= 3:
+            st.markdown("---")
+            if st.button("大会を終了して結果を見る", type="secondary", use_container_width=True):
+                tm.is_finished = True
                 st.rerun()
     
     # 対戦表示
