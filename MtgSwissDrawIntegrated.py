@@ -12,7 +12,9 @@ MtgSwissDrawIntegrated.py
 import streamlit as st
 import pandas as pd
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict
+import random
+import re
 
 # --- 定数定義 (const.pyの内容を統合) ---
 SET_PAGE_CONFIG = {
@@ -258,11 +260,15 @@ class TournamentManager:
             # 優先度2: 全員と対戦済みの場合は、ポイントが一番近い(リストの先頭)相手と組む
             # -> 修正: ここで無理に対戦させず、マッチング不成立＝大会終了とみなす
             if opponent is None:
-                # 対戦可能な相手がいない(これ以上スイスドローを組めない)
-                # 残り全員が対戦済みならここで終了フラグを立てる
-                self.is_finished = True
-                self.current_matches = [] # 今回作りかけたマッチングは破棄
-                return False # ラウンド作成失敗＝終了
+                if not active_players:
+                    # 残りのプレイヤーがいない = 奇数人の余り (Bye)
+                    self.current_matches.append(RoundMatch(p1, None))
+                    continue # 次のループへ（while条件で終了するはず）
+                else:
+                    # 相手候補はいるが、全員対戦済みで組めない -> 大会終了
+                    self.is_finished = True
+                    self.current_matches = [] # 今回作りかけたマッチングは破棄
+                    return False # ラウンド作成失敗＝終了
             
             # ペアリング確定
             self.current_matches.append(RoundMatch(p1, opponent))
@@ -323,12 +329,21 @@ def render_sidebar(tm: TournamentManager):
     
     # プレイヤー追加
     with st.sidebar.form("add_player_form", clear_on_submit=True):
-        new_name = st.text_input("プレイヤー名を追加")
+        new_name = st.text_input("プレイヤー名を追加 (複数可: '、'やスペース区切り)")
         submitted = st.form_submit_button("追加")
         if submitted and new_name:
-            tm.add_player(new_name)
-            st.success(f"{new_name} を追加しました")
-            st.rerun()
+            # 区切り文字（全角/半角スペース、読点、句点、カンマ、ドット）で分割
+            names = re.split(r'[、, \u3000。.]+', new_name)
+            count = 0
+            for name in names:
+                name = name.strip()
+                if name:
+                    tm.add_player(name)
+                    count += 1
+            
+            if count > 0:
+                st.success(f"{count} 名を追加しました")
+                st.rerun()
 
     # プレイヤー一覧・削除
     st.sidebar.subheader(f"参加者一覧 ({len(tm.players)}名)")
