@@ -59,6 +59,14 @@ class PlayerData:
         self.match_win_count = 0  # 純粋な勝利回数
         self.history: List[MatchResult] = []
 
+    def has_played_against(self, opponent_name: str) -> bool:
+        """指定した名前の相手と既に対戦済みか確認する"""
+        if opponent_name == self.name: return True
+        for h in self.history:
+            if h.opponent_name == opponent_name:
+                return True
+        return False
+
     def add_result(self, opponent_name: str, result: str):
         """対戦結果を記録し、勝ち点を更新する"""
         self.history.append(MatchResult(opponent_name, result))
@@ -153,22 +161,32 @@ class TournamentManager:
         self.current_round += 1
         self.current_matches = []
         
-        # マッチングロジック (簡易版: リストの上から順に当てる)
-        # 本来はスイスドロー形式で勝ち点が近い人同士をソートしてからマッチングする
-        # ここでは単純に現在のリスト順序を使用
+        # マッチングロジック (改善版: 重複回避の貪欲法)
         active_players = self.players.copy()
-        
         # 勝ち点順にソート（降順）
         active_players.sort(key=lambda p: p.win_points, reverse=True)
 
-        count = len(active_players)
-        for i in range(0, count, 2):
-            p1 = active_players[i]
-            if i + 1 < count:
-                p2 = active_players[i+1]
-                self.current_matches.append(RoundMatch(p1, p2))
+        while active_players:
+            p1 = active_players.pop(0) # 最もポイントが高いプレイヤーを取り出す
+            
+            # 対戦相手を探す
+            opponent = None
+            
+            # 優先度1: まだ対戦していない相手
+            for i, p2 in enumerate(active_players):
+                if not p1.has_played_against(p2.name):
+                    opponent = active_players.pop(i)
+                    break
+            
+            # 優先度2: 全員と対戦済みの場合は、ポイントが一番近い(リストの先頭)相手と組む
+            if opponent is None and active_players:
+                opponent = active_players.pop(0)
+            
+            # ペアリング確定またはByo
+            if opponent:
+                self.current_matches.append(RoundMatch(p1, opponent))
             else:
-                # 奇数人の余り -> Bye
+                # 相手が見つからず、リストも空 -> 余り (Bye)
                 self.current_matches.append(RoundMatch(p1, None))
 
     def get_standings_df(self) -> pd.DataFrame:
@@ -177,6 +195,21 @@ class TournamentManager:
         df = pd.DataFrame(data)
         if not df.empty:
             df = df.sort_values("勝ち点", ascending=False)
+        return df
+
+    def get_history_df(self) -> pd.DataFrame:
+        """対戦履歴専用のDataFrameを取得"""
+        data = []
+        for p in self.players:
+            row = {"ID": p.id, "名前": p.name}
+            for i, h in enumerate(p.history):
+                # 表示形式: "相手名 (勝敗)"
+                row[f"R{i+1}"] = f"{h.opponent_name} ({h.result})"
+            data.append(row)
+            
+        df = pd.DataFrame(data)
+        if not df.empty:
+            df = df.sort_values("ID")
         return df
 
     def reset_tournament(self):
@@ -293,6 +326,14 @@ def render_standings(tm: TournamentManager):
         st.dataframe(df, use_container_width=True, hide_index=True)
     else:
         st.write("データなし")
+
+    # 対戦履歴表の表示
+    if tm.current_round > 0:
+        st.markdown("---")
+        st.header("📜 対戦履歴詳細")
+        df_history = tm.get_history_df()
+        if not df_history.empty:
+            st.dataframe(df_history, use_container_width=True, hide_index=True)
 
 def main():
     st.set_page_config(**SET_PAGE_CONFIG)
