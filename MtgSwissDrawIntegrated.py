@@ -304,7 +304,27 @@ class TournamentManager:
         df = pd.DataFrame(data)
         if not df.empty:
             df = df.sort_values("ID")
+    def get_history_df(self) -> pd.DataFrame:
+        """対戦履歴専用のDataFrameを取得"""
+        data = []
+        for p in self.players:
+            row = {"ID": p.id, "名前": p.name}
+            for i, h in enumerate(p.history):
+                # 表示形式: "相手名 (勝敗)"
+                row[f"R{i+1}"] = f"{h.opponent_name} ({h.result})"
+            data.append(row)
+            
+        df = pd.DataFrame(data)
+        if not df.empty:
+            df = df.sort_values("ID")
         return df
+
+    @property
+    def is_current_round_complete(self) -> bool:
+        """現在のラウンドの全試合が終了しているか"""
+        if not self.current_matches:
+            return True
+        return all(m.is_finished for m in self.current_matches)
 
     def reset_tournament(self):
         """大会データをリセット"""
@@ -498,7 +518,9 @@ def main():
     with col1:
         # 次のラウンドへ進むボタン
         if st.button("次の一回戦を開始", type="primary", use_container_width=True):
-            if len(tm.players) < 2:
+            if not tm.is_current_round_complete:
+                st.error("⚠️ 全ての対戦結果が入力されていません。")
+            elif len(tm.players) < 2:
                 st.error("プレイヤーが2名以上必要です")
             else:
                 success = tm.start_new_round()
