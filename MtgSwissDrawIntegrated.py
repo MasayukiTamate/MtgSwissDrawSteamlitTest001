@@ -15,13 +15,14 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Dict
 import random
 import re
+import streamlit.components.v1 as components
 
 # --- 定数定義 (const.pyの内容を統合) ---
 SET_PAGE_CONFIG = {
     "page_title": "MTG Swiss Draw Manager",
-    "page_icon": "🃏",
+    "page_icon": "�",
     "layout": "wide",
-    "initial_sidebar_state": "expanded",
+    "initial_sidebar_state": "expanded", # サイドバーを常に開く設定
 }
 
 # デフォルトのスタイル非表示設定
@@ -29,7 +30,24 @@ HIDE_ST_STYLE = """
 <style>
 div[data-testid="stToolbar"] {visibility: hidden;}
 div[data-testid="stDecoration"] {visibility: hidden;}
+div[data-testid="stHeader"] {visibility: hidden;}
+div[data-testid="stStatusWidget"] {visibility: hidden;}
 footer {visibility: hidden;}
+#MainMenu {visibility: hidden;}
+header {visibility: hidden;}
+/* サイドバーの展開ボタン(>)を大きく目立たせる */
+button[data-testid="baseButton-header"] {
+    background-color: #FF4B4B;
+    color: white;
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 9999;
+    opacity: 1.0 !important;
+}
 </style>
 """
 
@@ -333,19 +351,6 @@ class TournamentManager:
         df = pd.DataFrame(data)
         if not df.empty:
             df = df.sort_values("ID")
-    def get_history_df(self) -> pd.DataFrame:
-        """対戦履歴専用のDataFrameを取得"""
-        data = []
-        for p in self.players:
-            row = {"ID": p.id, "名前": p.name}
-            for i, h in enumerate(p.history):
-                # 表示形式: "相手名 (勝敗)"
-                row[f"R{i+1}"] = f"{h.opponent_name} ({h.result})"
-            data.append(row)
-            
-        df = pd.DataFrame(data)
-        if not df.empty:
-            df = df.sort_values("ID")
         return df
 
     @property
@@ -371,14 +376,15 @@ def init_session():
     """セッションステートの初期化"""
     if "tm" not in st.session_state:
         st.session_state.tm = TournamentManager()
+    # UI設定の初期値
+    if "ui_player_form_position" not in st.session_state:
+        st.session_state.ui_player_form_position = "サイドバー上部"
 
-def render_sidebar(tm: TournamentManager):
-    """サイドバー：プレイヤー管理"""
-    st.sidebar.header("🛠 プレイヤー管理")
-    
-    # プレイヤー追加
-    with st.sidebar.form("add_player_form", clear_on_submit=True):
-        new_name = st.text_input("プレイヤー名を追加 (複数可: '、'やスペース区切り)")
+def render_add_player_form(tm: TournamentManager):
+    """プレイヤー追加フォームの描画（場所は可変）"""
+    st.subheader("➕ プレイヤー追加")
+    with st.form("add_player_form", clear_on_submit=True):
+        new_name = st.text_input("名前 (複数可: '、'やスペース区切り)")
         submitted = st.form_submit_button("追加")
         if submitted and new_name:
             # 区切り文字（全角/半角スペース、読点、句点、カンマ、ドット）で分割
@@ -394,6 +400,15 @@ def render_sidebar(tm: TournamentManager):
                 st.success(f"{count} 名を追加しました")
                 st.rerun()
 
+def render_sidebar(tm: TournamentManager):
+    """サイドバー：プレイヤー管理"""
+    st.sidebar.header("🛠 プレイヤー管理")
+    
+    # 設定に応じて表示位置を変える
+    if st.session_state.ui_player_form_position == "サイドバー上部":
+        with st.sidebar:
+            render_add_player_form(tm)
+
     # プレイヤー一覧・削除
     st.sidebar.subheader(f"参加者一覧 ({len(tm.players)}名)")
     for p in tm.players:
@@ -403,11 +418,17 @@ def render_sidebar(tm: TournamentManager):
             tm.remove_player(p.id)
             st.rerun()
             
+            
     st.sidebar.markdown("---")
+    
+    # (設定UIはメイン画面へ移動しました)
+    
     if st.sidebar.button("大会リセット (全データ削除)", type="primary"):
         tm.reset_tournament()
         st.rerun()
 
+    st.sidebar.caption("By たま工房")
+    
 def render_matches(tm: TournamentManager):
     """メインエリア：対戦組み合わせと結果入力"""
     st.header(f"⚔️ 第 {tm.current_round} 回戦")
@@ -537,6 +558,9 @@ def main():
     init_session()
     tm = st.session_state.tm # シングルトン的に扱うインスタンス
 
+    # サイドバー（プレイヤー管理など）は常に表示
+    render_sidebar(tm)
+
     # 大会終了済みなら結果画面へ
     if tm.is_finished:
         render_final_result(tm)
@@ -544,8 +568,44 @@ def main():
 
     st.title("MTG Swiss Draw Manager (OOP Ver)")
 
+    # 設定UI (メイン画面)
+    with st.expander("⚙️ 表示設定"):
+        st.radio(
+            "プレイヤー追加フォームの位置",
+            ["サイドバー上部", "メイン画面上部"],
+            key="ui_player_form_position",
+            help="入力欄の場所を変更できます"
+        )
+
+    # 設定に応じてメイン画面にプレイヤー追加フォームを表示
+    if st.session_state.ui_player_form_position == "メイン画面上部":
+        render_add_player_form(tm)
+
+    # サイドバー展開ボタン (メイン画面用)
+    if st.button("⬅️ サイドバーを表示する", help="もしサイドバーが閉じてしまっている場合、ここを押すと開きます"):
+        # JavaScriptを注入して、サイドバー開閉ボタンをクリックさせる
+        # 複数のセレクタを試して、見つかったものをクリック
+        js = """
+        <script>
+            var selectors = [
+                'button[data-testid="baseButton-header"]',
+                'button[data-testid="stSidebarCollapsedControl"]',
+                'button[kind="header"]'
+            ];
+            var btn = null;
+            for (var i = 0; i < selectors.length; i++) {
+                btn = window.parent.document.querySelector(selectors[i]);
+                if (btn) break;
+            }
+            if (btn) {
+                btn.click();
+            }
+        </script>
+        """
+        components.html(js, height=0, width=0)
+
     # レイアウト
-    render_sidebar(tm)
+    # render_sidebar(tm) # 移動済み
     
     # メインコントロール
     col1, col2 = st.columns([1, 4])
