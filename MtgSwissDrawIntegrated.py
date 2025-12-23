@@ -585,6 +585,19 @@ def main():
     if st.session_state.ui_player_form_position == "メイン画面上部":
         render_add_player_form(tm)
 
+    # アプリ全体の初期化ボタンをメインに追加
+    with st.expander("♻️ 高度な設定 / 初期化"):
+        st.warning("⚠️ 以下のボタンはアプリの状態を完全に初期化します。サイドバーが消えてしまった場合の復元にも使用できます。")
+        if st.button("アプリの状態を初期化（キャッシュ・セッションのクリア）", type="secondary", use_container_width=True):
+            # キャッシュのクリア
+            st.cache_data.clear()
+            st.cache_resource.clear()
+            # セッションのクリア
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            # 再起動
+            st.rerun()
+
     # サイドバー展開ボタン (一度消去)
 
     # レイアウト
