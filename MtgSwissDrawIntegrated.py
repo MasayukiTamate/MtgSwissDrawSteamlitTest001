@@ -35,19 +35,6 @@ div[data-testid="stStatusWidget"] {visibility: hidden;}
 footer {visibility: hidden;}
 #MainMenu {visibility: hidden;}
 header {visibility: hidden;}
-/* サイドバーの展開ボタン(>)を大きく目立たせる */
-button[data-testid="baseButton-header"] {
-    background-color: #FF4B4B;
-    color: white;
-    width: 60px;
-    height: 60px;
-    border-radius: 10px;
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    z-index: 9999;
-    opacity: 1.0 !important;
-}
 </style>
 """
 
@@ -581,28 +568,7 @@ def main():
     if st.session_state.ui_player_form_position == "メイン画面上部":
         render_add_player_form(tm)
 
-    # サイドバー展開ボタン (メイン画面用)
-    if st.button("⬅️ サイドバーを表示する", help="もしサイドバーが閉じてしまっている場合、ここを押すと開きます"):
-        # JavaScriptを注入して、サイドバー開閉ボタンをクリックさせる
-        # 複数のセレクタを試して、見つかったものをクリック
-        js = """
-        <script>
-            var selectors = [
-                'button[data-testid="baseButton-header"]',
-                'button[data-testid="stSidebarCollapsedControl"]',
-                'button[kind="header"]'
-            ];
-            var btn = null;
-            for (var i = 0; i < selectors.length; i++) {
-                btn = window.parent.document.querySelector(selectors[i]);
-                if (btn) break;
-            }
-            if (btn) {
-                btn.click();
-            }
-        </script>
-        """
-        components.html(js, height=0, width=0)
+    # サイドバー展開ボタン (一度消去)
 
     # レイアウト
     # render_sidebar(tm) # 移動済み
