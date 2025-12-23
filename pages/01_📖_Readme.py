@@ -1,4 +1,5 @@
 import streamlit as st
+from config import AUTHOR_NAME, AUTHOR_LINK_MD, AUTHOR_NAME_EN, AUTHOR_LINK_MD_EN
 
 st.set_page_config(
     page_title="Readme - MTG Swiss Draw Manager",
@@ -14,9 +15,9 @@ tab_jp, tab_en = st.tabs(["🇯🇵 日本語", "🇺🇸 English"])
 # --- 日本語 ---
 with tab_jp:
     st.header("MTG Swiss Draw Manager (OOP Ver)")
-    st.caption("By たま工房")
+    st.caption(f"By {AUTHOR_LINK_MD}")
     
-    st.markdown("""
+    st.markdown(f"""
     ### 概要
     **MTG Swiss Draw Manager** は、Magic: The Gathering (MTG) の大会をスムーズに運営するためのスイスドロー管理アプリケーションです。
     個人主催の小さな大会や、コミュニティでのイベントに最適化されており、直感的な操作でペアリングから順位計算までを自動化します。
@@ -38,16 +39,16 @@ with tab_jp:
         *   大会途中での終了・結果発表機能
 
     ### 作者について
-    このアプリケーションは **たま工房** によって開発されました。
+    このアプリケーションは **{AUTHOR_LINK_MD}** によって開発されました。
     ユーザーの皆様からのフィードバックを元に、機能改善を続けています。
     """)
 
 # --- English ---
 with tab_en:
     st.header("MTG Swiss Draw Manager (OOP Ver)")
-    st.caption("By Tamale Studio (Tama-Kobo)")
+    st.caption(f"By {AUTHOR_LINK_MD_EN}")
     
-    st.markdown("""
+    st.markdown(f"""
     ### Overview
     **MTG Swiss Draw Manager** is a Swiss Draw management application designed for running Magic: The Gathering (MTG) tournaments smoothly.
     It is optimized for small privately hosted tournaments and community events, automating everything from pairings to standings calculations with intuitive controls.
@@ -69,6 +70,6 @@ with tab_en:
         *   Option to end the tournament midway and view final results.
 
     ### About the Author
-    This application was developed by **Tamale Studio**.
+    This application was developed by **{AUTHOR_LINK_MD_EN}**.
     We continue to improve features based on feedback from our users.
     """)

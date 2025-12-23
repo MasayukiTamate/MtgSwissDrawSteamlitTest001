@@ -15,12 +15,13 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Dict
 import random
 import re
-import streamlit.components.v1 as components
+from streamlit.components.v1 import html as components_html
+from config import AUTHOR_LINK_MD
 
 # --- 定数定義 (const.pyの内容を統合) ---
 SET_PAGE_CONFIG = {
     "page_title": "MTG Swiss Draw Manager",
-    "page_icon": "�",
+    "page_icon": "🏆",
     "layout": "wide",
     "initial_sidebar_state": "expanded", # サイドバーを常に開く設定
 }
@@ -102,33 +103,41 @@ class PlayerData:
             self.win_points -= 1
     
     def calculate_mw_percent(self) -> float:
-        """マッチ勝率 (MW%)"""
-        matches = len(self.history)
-        if matches == 0:
-            return 0.0
+        """
+        マッチ勝率 (MW%) を計算する。
+        MTG公式ルールに準拠し、BYE（不戦勝）は試合数および獲得ポイントの計算から完全に除外する。
+        これにより、実際にプレイした試合の成績のみで勝率が算出される。
+        """
+        # 実際の対戦（BYE以外）を抽出
+        actual_matches = [h for h in self.history if h.result != "BYE"]
+        if not actual_matches:
+            return 0.33 # 対戦がない場合は公式ルールに基づき下限値(33%)を返す
         
-        # ポイントから算出ルール (MTG準拠: Points / (3 * Matches))
-        # ただし下限33%
-        raw_mw = self.win_points / (3 * matches)
-        return max(0.33, raw_mw)
+        # 実際の対戦での勝ち点を合計
+        actual_points = 0
+        for h in actual_matches:
+            if h.result == "WIN": actual_points += 3
+            elif h.result == "DRAW": actual_points += 1
+            
+        # 勝率 = 獲得ポイント / (実際の試合数 * 勝利時の3点)
+        raw_mw = actual_points / (3 * len(actual_matches))
+        return max(0.33, raw_mw) # 下限33%を適用
 
     def calculate_gw_percent(self) -> float:
-        """ゲーム勝率 (GW%)"""
-        # (獲得ゲームポイント) / (総プレイゲーム数 * 3) 
-        # 当アプリでは入力されたゲーム数ベースで計算
-        total_game_wins = sum(h.game_wins for h in self.history)
-        total_game_losses = sum(h.game_losses for h in self.history)
-        # Byeの場合はゲーム数0だが、勝ち点3相当(2-0)として扱う規定が一般的だが、
-        # ここでは実装簡略化のため、Byeは2-0としてカウントする
-        for h in self.history:
-            if h.result == "BYE":
-                total_game_wins += 2
+        """
+        ゲーム勝率 (GW%) を計算する。
+        BYEによる自動的な2-0勝利は、タイブレーカーとしてのゲーム勝率には含めない。
+        """
+        # 実際の対戦（BYE以外）を抽出
+        actual_matches = [h for h in self.history if h.result != "BYE"]
+        
+        total_game_wins = sum(h.game_wins for h in actual_matches)
+        total_game_losses = sum(h.game_losses for h in actual_matches)
         
         total_games = total_game_wins + total_game_losses
         if total_games == 0:
-            return 0.0
+            return 0.33 # 下限33%を適用
             
-        # 勝率 = 勝ったゲーム数 / 総ゲーム数
         return total_game_wins / total_games
 
     def calculate_omw_percent(self, all_players: List['PlayerData']) -> float:
@@ -262,22 +271,30 @@ class TournamentManager:
         """指定IDのプレイヤーを削除する"""
         self.players = [p for p in self.players if p.id != player_id]
 
-    def start_new_round(self):
+    def start_new_round(self, randomize: bool = False):
         """
         新しいラウンドのマッチングを作成する
-        簡易ロジック: 現在のリスト順（登録順または勝ち点順でソート後に呼ぶ想定）で上からペアリング
+        
+        引数:
+            randomize (bool): Trueの場合、ペアリング前にプレイヤーリストをシャッフルする（主に第1回戦用）
         """
-        # 未完了の試合がある場合は警告などを出すべきだが、ここでは強制進行
+        # 未完了の試合がある場合は記録済みとして履歴へ移動
         if self.current_matches:
             self.rounds_history.append(self.current_matches)
         
         self.current_round += 1
         self.current_matches = []
         
-        # マッチングロジック (改善版: 重複回避の貪欲法)
+        # マッチング用のプレイヤーリスト準備
         active_players = self.players.copy()
-        # 勝ち点順にソート（降順）
-        active_players.sort(key=lambda p: p.win_points, reverse=True)
+        
+        if randomize:
+            import random
+            random.shuffle(active_players)
+        else:
+            # 通常は勝ち点順にソート（降順）
+            # 第1回戦(win_points=0)の場合は、実質的に登録順となる
+            active_players.sort(key=lambda p: p.win_points, reverse=True)
 
         while active_players:
             p1 = active_players.pop(0) # 最もポイントが高いプレイヤーを取り出す
@@ -414,7 +431,7 @@ def render_sidebar(tm: TournamentManager):
         tm.reset_tournament()
         st.rerun()
 
-    st.sidebar.caption("By たま工房")
+    st.sidebar.caption(f"By {AUTHOR_LINK_MD}")
     
 def render_matches(tm: TournamentManager):
     """メインエリア：対戦組み合わせと結果入力"""
@@ -576,19 +593,35 @@ def main():
     # メインコントロール
     col1, col2 = st.columns([1, 4])
     with col1:
-        # 次のラウンドへ進むボタン
-        if st.button("次の一回戦を開始", type="primary", use_container_width=True):
-            if not tm.is_current_round_complete:
-                st.error("⚠️ 全ての対戦結果が入力されていません。")
-            elif len(tm.players) < 2:
-                st.error("プレイヤーが2名以上必要です")
-            else:
-                success = tm.start_new_round()
-                if not success:
-                    # ラウンド作成失敗 ＝ 大会終了
-                    st.rerun()
+        # 第1回戦のみ特別なボタン表示
+        if tm.current_round == 0:
+            # 登録順で開始
+            if st.button("並び順で対戦を開始", type="primary", use_container_width=True, help="プレイヤーリストの登録順でマッチングします"):
+                if len(tm.players) < 2:
+                    st.error("プレイヤーが2名以上必要です")
                 else:
+                    tm.start_new_round(randomize=False)
                     st.rerun()
+            
+            # ランダムで開始
+            if st.button("ランダムに対戦を開始", type="primary", use_container_width=True, help="プレイヤーの並びをシャッフルしてからマッチングします"):
+                if len(tm.players) < 2:
+                    st.error("プレイヤーが2名以上必要です")
+                else:
+                    tm.start_new_round(randomize=True)
+                    st.rerun()
+        else:
+            # 次のラウンドへ進むボタン (2回戦以降)
+            if st.button("次のラウンドを開始", type="primary", use_container_width=True):
+                if not tm.is_current_round_complete:
+                    st.error("⚠️ 全ての対戦結果が入力されていません。")
+                else:
+                    success = tm.start_new_round()
+                    if not success:
+                        # ラウンド作成失敗 ＝ 大会終了
+                        st.rerun()
+                    else:
+                        st.rerun()
         
         # 第3回戦以降: 途中終了して結果発表を行うボタン
         if tm.current_round >= 3:

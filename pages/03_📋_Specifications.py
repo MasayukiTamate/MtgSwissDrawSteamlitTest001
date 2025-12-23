@@ -25,10 +25,12 @@ with tab_jp:
     *   **重複対戦の回避**: 大会中、同じ相手と2回当たることはありません。
     *   **Bye（不戦勝）**: 
         *   プレイヤーが奇数の場合、その回戦で最も順位が低い（かつ、まだByeを経験していない）プレイヤーにByeが与えられます。
-        *   Byeは「マッチ勝利（3点）」および「ゲーム勝利 2-0」として扱われます。
+        *   Byeは「マッチ勝利（3点）」としてマッチポイントには加算されますが、**タイブレーカー（MW%, GW%等）の計算からは完全に除外**されます。
+        *   つまり、不戦勝以外の「実際にプレイした対戦成績」のみで勝率が算出されます。
 
     #### 3. 順位決定ルール (Tie-breakers)
     MTGの公式競技ルールに準拠した以下の優先順位で決定します。
+    (※BYEは以下の計算の分母・分子には含まれません)
 
     1.  **マッチポイント (Match Points)**
         *   勝利：3点、引き分け：1点、敗北：0点。
@@ -67,10 +69,12 @@ with tab_en:
     *   **Avoid Repeat Matchups**: Players will not be paired against the same opponent more than once in a single tournament.
     *   **Bye (Free Win)**: 
         *   If the number of players is odd, a Bye is awarded to the lowest-ranked player in that round who has not yet received a Bye.
-        *   A Bye is treated as a "Match Win (3 pts)" and a "Game Win 2-0".
+        *   A Bye is added to the Match Points (3 pts) for standings, but **completely excluded from tie-breaker calculations (MW%, GW%, etc.)**.
+        *   This means win percentages are calculated based only on "actually played matches."
 
     #### 3. Standings Rules (Tie-breakers)
     Determined by the following order of priority, based on official MTG competitive rules:
+    (*Byes are excluded from the denominators and numerators of these calculations)
 
     1.  **Match Points**
         *   Win: 3 pts, Draw: 1 pt, Loss: 0 pts.
